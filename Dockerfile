@@ -45,7 +45,8 @@ RUN apt update && apt install -y --no-install-recommends \
     7zip \
     vim \
     cron \
-    jq
+    jq \
+    libnss-wrapper
 
 WORKDIR /opt/server
 

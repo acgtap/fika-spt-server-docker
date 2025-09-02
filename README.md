@@ -88,6 +88,7 @@ This image now supports running in Pterodactyl panel environments without requir
 - Skips cron service startup (no write access to /var/run)
 - Disables automatic profile backups (cron service unavailable)
 - Skips timezone file system modifications (read-only filesystem)
+- Creates temporary user entries for Node.js compatibility (fixes `uv_os_get_passwd` errors)
 - All server files are stored in `/home/container` with container user permissions
 
 **Note:** In Pterodactyl environments, timezone changes via TZ environment variable will be recognized but not persisted to the filesystem due to read-only restrictions.

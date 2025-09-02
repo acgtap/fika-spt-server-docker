@@ -320,6 +320,32 @@ set_timezone
 # Run the server
 if is_pterodactyl_env; then
     echo "Starting SPT Server in Pterodactyl environment"
+    
+    # Create a temporary passwd entry to fix Node.js user lookup
+    current_uid=$(id -u)
+    current_gid=$(id -g)
+    current_user=$(whoami 2>/dev/null || echo "container")
+    
+    # Create temporary passwd file if it doesn't contain current user
+    if ! getent passwd $current_uid >/dev/null 2>&1; then
+        echo "Creating temporary user entry for Node.js compatibility"
+        # Create a temporary passwd file
+        temp_passwd="/tmp/passwd"
+        cp /etc/passwd "$temp_passwd" 2>/dev/null || touch "$temp_passwd"
+        echo "${current_user}:x:${current_uid}:${current_gid}:Container User:/home/container:/bin/bash" >> "$temp_passwd"
+        export NSS_WRAPPER_PASSWD="$temp_passwd"
+        export NSS_WRAPPER_GROUP="/etc/group"
+        
+        # Preload NSS wrapper
+        export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libnss_wrapper.so"
+    fi
+    
+    # Set environment variables to handle missing user info in Pterodactyl
+    export HOME=${HOME:-/home/container}
+    export USER=${USER:-$current_user}
+    export LOGNAME=${LOGNAME:-$current_user}
+    export SHELL=${SHELL:-/bin/bash}
+    
     cd $mounted_dir && ./SPT.Server.exe
 else
     su - $(id -nu $uid) -c "cd $mounted_dir && ./SPT.Server.exe"
