@@ -82,6 +82,13 @@ services:
 ### Pterodactyl Panel Support
 This image now supports running in Pterodactyl panel environments without requiring volume mounts. When `/home/container` directory exists and `/opt/server` is not mounted, the container will automatically use `/home/container` as the server directory. This allows the image to work seamlessly in Pterodactyl panel setups where volume mounting is not available.
 
+**Pterodactyl Environment Adaptations:**
+- Automatically skips user/group creation (uses container user)
+- Disables file ownership and permission changes (no chown/chmod permissions)
+- Skips cron service startup (no write access to /var/run)
+- Disables automatic profile backups (cron service unavailable)
+- All server files are stored in `/home/container` with container user permissions
+
 If you want to run the server as a different user than root, set UID and GID
 ```yaml
 services:

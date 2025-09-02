@@ -41,12 +41,25 @@ num_headless_profiles=${NUM_HEADLESS_PROFILES:+"$NUM_HEADLESS_PROFILES"}
 
 install_other_mods=${INSTALL_OTHER_MODS:-false}
 
+# Check if running in Pterodactyl environment
+is_pterodactyl_env() {
+    [[ "$mounted_dir" == "/home/container" ]]
+}
+
 start_crond() {
+    if is_pterodactyl_env; then
+        echo "Skipping cron service in Pterodactyl environment (no write access to /var/run)"
+        return
+    fi
     echo "Enabling profile backups"
     /etc/init.d/cron start
 }
 
 create_running_user() {
+    if is_pterodactyl_env; then
+        echo "Skipping user creation in Pterodactyl environment (using container user)"
+        return
+    fi
     echo "Checking running user/group: $uid:$gid"
     getent group $gid || groupadd -g $gid spt
     if [[ ! $(id -un $uid) ]]; then
@@ -98,6 +111,10 @@ make_and_own_spt_dirs() {
 }
 
 change_owner() {
+    if is_pterodactyl_env; then
+        echo "Skipping ownership changes in Pterodactyl environment (no chown permissions)"
+        return
+    fi
     if [[ "$take_ownership" == "true" ]]; then
         echo "Changing owner of serverfiles to $uid:$gid"
         chown -R ${uid}:${gid} $mounted_dir
@@ -105,6 +122,10 @@ change_owner() {
 }
 
 set_permissions() {
+    if is_pterodactyl_env; then
+        echo "Skipping permission changes in Pterodactyl environment (using container permissions)"
+        return
+    fi
     if [[ "$change_permissions" == "true" ]]; then
         echo "Changing permissions of server files to user+rwx, group+rwx, others+rx"
         # owner(u), (g)roup, (o)ther
@@ -290,4 +311,10 @@ set_permissions
 
 set_timezone
 
-su - $(id -nu $uid) -c "cd $mounted_dir && ./SPT.Server.exe"
+# Run the server
+if is_pterodactyl_env; then
+    echo "Starting SPT Server in Pterodactyl environment"
+    cd $mounted_dir && ./SPT.Server.exe
+else
+    su - $(id -nu $uid) -c "cd $mounted_dir && ./SPT.Server.exe"
+fi
