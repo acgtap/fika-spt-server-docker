@@ -79,6 +79,9 @@ services:
       - ./path/to/server/files:/opt/server
 ```
 
+### Pterodactyl Panel Support
+This image now supports running in Pterodactyl panel environments without requiring volume mounts. When `/home/container` directory exists and `/opt/server` is not mounted, the container will automatically use `/home/container` as the server directory. This allows the image to work seamlessly in Pterodactyl panel setups where volume mounting is not available.
+
 If you want to run the server as a different user than root, set UID and GID
 ```yaml
 services:

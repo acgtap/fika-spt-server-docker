@@ -1,7 +1,13 @@
 #!/bin/bash -e
 
 build_dir=/opt/build
-mounted_dir=/opt/server
+# Support for Pterodactyl panel - use /home/container if /opt/server is not mounted
+if [[ -d /home/container && ! $(mount | grep /opt/server) ]]; then
+    mounted_dir=/home/container
+    echo "Detected Pterodactyl environment, using /home/container as server directory"
+else
+    mounted_dir=/opt/server
+fi
 spt_binary=SPT.Server.exe
 uid=${UID:-1000}
 gid=${GID:-1000}
@@ -56,10 +62,12 @@ validate() {
      fi
 
     # Must mount /opt/server directory, otherwise the serverfiles are in container and there's no persistence
-    if [[ ! $(mount | grep $mounted_dir) ]]; then
+    # Exception: In Pterodactyl environment, /home/container is acceptable
+    if [[ ! $(mount | grep $mounted_dir) && "$mounted_dir" != "/home/container" ]]; then
         echo "Please mount a volume/directory from the host to $mounted_dir. This server container must store files on the host."
         echo "You can do this with docker run's -v flag e.g. '-v /path/on/host:/opt/server'"
         echo "or with docker-compose's 'volumes' directive"
+        echo "Note: In Pterodactyl panel environment, this check is bypassed and /home/container is used"
         exit 1
     fi
 
