@@ -137,22 +137,28 @@ set_permissions() {
 set_timezone() {
     # If the TZ environment variable has been set, use it
     if [[ ! -z "${TZ}" ]]; then
-        # Update the /etc/timezone to the specified time zone
-        echo $TZ > /etc/timezone
+        # In Pterodactyl environment, skip writing to read-only /etc/timezone
+        if ! is_pterodactyl_env; then
+            echo $TZ > /etc/timezone
+        fi
     else
         # Grab the hour from the date command to compare against later
         before_date_hour=$(date +"%H")
 
         # Set TZ to the /etc/timezone, either mounted or the default from the container
-        TZ=$(cat /etc/timezone)
+        TZ=$(cat /etc/timezone 2>/dev/null || echo "UTC")
     fi
 
-    # Force update the symlink
-    ln -sf /usr/share/zoneinfo/$TZ /etc/localtime
-
-    # If there was actually a change in the timezone or TZ was specified (accounted for here when before_date_hour is not set above)
-    if [[ $before_date_hour != $(date +"%H") ]]; then
-        echo "Timezone set to $TZ";
+    # Force update the symlink (skip if in Pterodactyl and no write permissions)
+    if is_pterodactyl_env; then
+        echo "Skipping timezone symlink update in Pterodactyl environment (read-only filesystem)"
+        echo "Using timezone: ${TZ:-UTC}"
+    else
+        ln -sf /usr/share/zoneinfo/$TZ /etc/localtime
+        # If there was actually a change in the timezone or TZ was specified
+        if [[ $before_date_hour != $(date +"%H") ]]; then
+            echo "Timezone set to $TZ";
+        fi
     fi
 }
 

@@ -87,7 +87,10 @@ This image now supports running in Pterodactyl panel environments without requir
 - Disables file ownership and permission changes (no chown/chmod permissions)
 - Skips cron service startup (no write access to /var/run)
 - Disables automatic profile backups (cron service unavailable)
+- Skips timezone file system modifications (read-only filesystem)
 - All server files are stored in `/home/container` with container user permissions
+
+**Note:** In Pterodactyl environments, timezone changes via TZ environment variable will be recognized but not persisted to the filesystem due to read-only restrictions.
 
 If you want to run the server as a different user than root, set UID and GID
 ```yaml
