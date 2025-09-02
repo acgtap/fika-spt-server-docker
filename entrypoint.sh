@@ -28,7 +28,7 @@ fika_backup_dir=$backup_dir/fika/$(date +%Y%m%dT%H%M)
 fika_config_path=assets/configs/fika.jsonc
 fika_mod_dir=$mounted_dir/user/mods/fika-server
 fika_artifact=fika-server-$(echo $fika_version | cut -d 'v' -f 2).zip
-fika_release_url="https://ph.katomegumi.net/https://github.com/project-fika/Fika-Server/releases/download/$fika_version/$fika_artifact"
+fika_release_url="http://gh.halonice.com/https://github.com/project-fika/Fika-Server/releases/download/$fika_version/$fika_artifact"
 
 auto_update_spt=${AUTO_UPDATE_SPT:-false}
 auto_update_fika=${AUTO_UPDATE_FIKA:-false}
