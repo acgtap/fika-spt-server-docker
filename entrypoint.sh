@@ -167,9 +167,20 @@ set_timezone() {
 ########
 install_fika_mod() {
     echo "Installing Fika servermod version $fika_version"
+    echo "Fika release URL: $fika_release_url"
     # Assumes fika_server.zip artifact contains user/mods/fika-server
-    curl -sL $fika_release_url -O
+    # 增加更多curl日志和错误处理
+    echo "正在下载 Fika 服务器模组..."
+    if ! curl -sL --fail --show-error --connect-timeout 30 --max-time 300 -o "$fika_artifact" "$fika_release_url"; then
+        echo "错误：下载 Fika 服务器模组失败"
+        echo "URL: $fika_release_url"
+        echo "目标文件: $fika_artifact"
+        exit 1
+    fi
+    echo "Fika 服务器模组下载完成"
+    echo "Unzipping Fika servermod"
     unzip -q $fika_artifact -d $mounted_dir
+    echo "Removing Fika servermod artifact"
     rm $fika_artifact
     echo "Installation complete"
 }
