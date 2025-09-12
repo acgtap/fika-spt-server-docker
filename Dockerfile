@@ -18,6 +18,7 @@ WORKDIR /
 ARG SPT_SERVER_SHA=3.11.3
 ARG BUILD_TYPE=release
 
+ENV GIT_LFS_SKIP_SMUDGE=1
 RUN git clone https://github.com/sp-tarkov/server.git spt
 
 WORKDIR /spt/project
