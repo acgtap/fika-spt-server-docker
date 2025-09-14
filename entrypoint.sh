@@ -48,58 +48,58 @@ is_pterodactyl_env() {
 
 start_crond() {
     if is_pterodactyl_env; then
-        echo "Skipping cron service in Pterodactyl environment (no write access to /var/run)"
+        echo "跳过cron服务在Pterodactyl环境中（没有对/var/run的写入权限）"
         return
     fi
-    echo "Enabling profile backups"
+    echo "启用配置文件备份的cron守护进程"
     /etc/init.d/cron start
 }
 
 create_running_user() {
     if is_pterodactyl_env; then
-        echo "Skipping user creation in Pterodactyl environment (using container user)"
+        echo "跳过用户创建在Pterodactyl环境中（使用容器用户）"
         return
     fi
-    echo "Checking running user/group: $uid:$gid"
+    echo "检查运行中的用户/组: $uid:$gid"
     getent group $gid || groupadd -g $gid spt
     if [[ ! $(id -un $uid) ]]; then
-        echo "User not found, creating user 'spt' with id $uid"
+        echo "用户未找到，正在创建用户'spt'，ID为$uid"
         useradd --create-home -u $uid -g $gid spt
     fi
 }
 
 validate() {
-     if [[ ${num_headless_profiles:+1} && ! $num_headless_profiles =~ ^[0-9]+$ ]]; then
-         echo "NUM_HEADLESS_PROFILES must be a number.";
-         exit 1
-     fi
+    if [[ ${num_headless_profiles:+1} && ! $num_headless_profiles =~ ^[0-9]+$ ]]; then
+        echo "版本设置中 NUM_HEADLESS_PROFILES 必须是一个数字。";
+        exit 1
+    fi
 
     # Must mount /opt/server directory, otherwise the serverfiles are in container and there's no persistence
     # Exception: In Pterodactyl environment, /home/container is acceptable
     if [[ ! $(mount | grep $mounted_dir) && "$mounted_dir" != "/home/container" ]]; then
-        echo "Please mount a volume/directory from the host to $mounted_dir. This server container must store files on the host."
-        echo "You can do this with docker run's -v flag e.g. '-v /path/on/host:/opt/server'"
-        echo "or with docker-compose's 'volumes' directive"
-        echo "Note: In Pterodactyl panel environment, this check is bypassed and /home/container is used"
-        exit 1
+       echo "请将主机上的卷/目录挂载到 $mounted_dir。此服务器容器必须在主机上存储文件。"
+       echo "您可以使用docker run的-v标志来做到这一点，例如'-v /path/on/host:/opt/server'"
+       echo "或使用docker-compose的'volumes'指令"
+       echo "注意：在Pterodactyl面板环境中，此检查被绕过，使用/home/container"
+       exit 1
     fi
 
     # Validate SPT version
     if [[ -d $spt_data_dir && -f $spt_core_config ]]; then
-        echo "Validating SPT version"
-        existing_spt_version=$(jq -r '.sptVersion' $spt_core_config)
-        if [[ $existing_spt_version != "$spt_version" ]]; then
-            try_update_spt $existing_spt_version
-        fi
+       echo "验证 SPT 版本"
+       existing_spt_version=$(jq -r '.sptVersion' $spt_core_config)
+       if [[ $existing_spt_version != "$spt_version" ]]; then
+          try_update_spt $existing_spt_version
+       fi
     fi
 
     # Validate fika version
-    if [[ -d $fika_mod_dir && $install_fika == "true" ]]; then
-        echo "Validating Fika version"
-        existing_fika_version=$(jq -r '.version' $fika_mod_dir/package.json)
-        if [[ "v$existing_fika_version" != $fika_version ]]; then
-            try_update_fika "v$existing_fika_version"
-        fi
+    if [[ -d $fika_mod_dir && -f $fika_mod_dir/package.json && $install_fika == "true" ]]; then
+       echo "验证 Fika 版本"
+       existing_fika_version=$(jq -r '.version' $fika_mod_dir/package.json)
+       if [[ "v$existing_fika_version" != $fika_version ]]; then
+          try_update_fika "v$existing_fika_version"
+       fi
     fi
 }
 
@@ -112,22 +112,22 @@ make_and_own_spt_dirs() {
 
 change_owner() {
     if is_pterodactyl_env; then
-        echo "Skipping ownership changes in Pterodactyl environment (no chown permissions)"
+        echo "跳过在Pterodactyl环境中的所有权更改（没有chown权限）"
         return
     fi
     if [[ "$take_ownership" == "true" ]]; then
-        echo "Changing owner of serverfiles to $uid:$gid"
+        echo "正在将服务器文件的所有者更改为 $uid:$gid"
         chown -R ${uid}:${gid} $mounted_dir
     fi
 }
 
 set_permissions() {
     if is_pterodactyl_env; then
-        echo "Skipping permission changes in Pterodactyl environment (using container permissions)"
+        echo "跳过在Pterodactyl环境中的权限更改（使用容器权限）"
         return
     fi
     if [[ "$change_permissions" == "true" ]]; then
-        echo "Changing permissions of server files to user+rwx, group+rwx, others+rx"
+        echo "正在将服务器文件的权限更改为 user+rwx, group+rwx, others+rx"
         # owner(u), (g)roup, (o)ther
         # (r)ead, (w)rite, e(x)ecute
         chmod -R u+rwx,g+rwx,o+rx $mounted_dir
@@ -151,13 +151,13 @@ set_timezone() {
 
     # Force update the symlink (skip if in Pterodactyl and no write permissions)
     if is_pterodactyl_env; then
-        echo "Skipping timezone symlink update in Pterodactyl environment (read-only filesystem)"
-        echo "Using timezone: ${TZ:-UTC}"
+        echo "跳过在Pterodactyl环境中的时区符号链接更新（只读文件系统）"
+        echo "使用时区: ${TZ:-UTC}"
     else
         ln -sf /usr/share/zoneinfo/$TZ /etc/localtime
         # If there was actually a change in the timezone or TZ was specified
         if [[ $before_date_hour != $(date +"%H") ]]; then
-            echo "Timezone set to $TZ";
+            echo "时区设置为 $TZ";
         fi
     fi
 }
@@ -165,8 +165,10 @@ set_timezone() {
 ########
 # Fika #
 ########
+# Fika #
+########
 install_fika_mod() {
-    echo "Installing Fika servermod version $fika_version"
+    echo "安装 Fika servermod 版本 $fika_version"
     echo "Fika release URL: $fika_release_url"
     # Assumes fika_server.zip artifact contains user/mods/fika-server
     # 增加更多curl日志和错误处理
@@ -178,11 +180,11 @@ install_fika_mod() {
         exit 1
     fi
     echo "Fika 服务器模组下载完成"
-    echo "Unzipping Fika servermod"
+    echo "解压 Fika servermod"
     unzip -q $fika_artifact -d $mounted_dir
-    echo "Removing Fika servermod artifact"
+    echo "正在删除 Fika servermod 工件"
     rm $fika_artifact
-    echo "Installation complete"
+    echo "----安装完成---"
 }
 
 backup_fika() {
@@ -192,13 +194,13 @@ backup_fika() {
 
 try_update_fika() {
     if [[ "$auto_update_fika" != "true" ]]; then
-        echo "Fika Version mismatch: Fika install requested but existing fika mod server is v$existing_fika_version while this image expects $fika_version"
-        echo "If you wish to use this container to update your Fika server mod, set AUTO_UPDATE_FIKA to true"
-        echo "Aborting"
+        echo "Fika 版本不匹配: 请求安装 Fika，但现有的 Fika mod 服务器是 v$existing_fika_version，而此镜像期望 $fika_version"
+        echo "如果您希望使用此容器来更新您的 Fika 服务器 mod，请将 AUTO_UPDATE_FIKA 设置为 true"
+        echo "中止"
         exit 1
     fi
 
-    echo "Updating Fika servermod in place, from $1 to $fika_version"
+    echo "更新 Fika servermod in place, from $1 to $fika_version"
     # Backup entire fika servermod, then delete and update servermod
     backup_fika
     rm -r $fika_mod_dir
@@ -206,12 +208,12 @@ try_update_fika() {
     # restore config
     mkdir -p $fika_mod_dir/assets/configs
     cp $fika_backup_dir/fika-server/$fika_config_path $fika_mod_dir/$fika_config_path
-    echo "Successfully updated Fika from $1 to $fika_version"
+    echo "成功将 Fika 从 $1 更新到 $fika_version"
 }
 
 set_num_headless_profiles() {
     if [[ ${num_headless_profiles:+1} && -f $fika_mod_dir/$fika_config_path ]]; then
-        echo "Setting number of headless profiles to $num_headless_profiles"
+        echo "将无头配置文件的数量设置为 $num_headless_profiles"
         modified_fika_jsonc="$(jq --arg jq_num_headless_profiles $num_headless_profiles '.headless.profiles.amount=$jq_num_headless_profiles' $fika_mod_dir/$fika_config_path)" && echo -E "${modified_fika_jsonc}" > $fika_mod_dir/$fika_config_path
     fi
 }
@@ -234,17 +236,17 @@ backup_spt_user_dirs() {
 
 try_update_spt() {
     if [[ "$auto_update_spt" != "true" ]]; then
-        echo "SPT Version mismatch: existing server files are SPT $existing_spt_version while this image expects $spt_version"
-        echo "If you wish to use this container to update your SPT Server files, set AUTO_UPDATE_SPT to true"
-        echo "Aborting"
+        echo "SPT 版本不匹配: 现有服务器文件是 SPT $existing_spt_version，而此镜像期望 $spt_version"
+        echo "如果您希望使用此容器来更新您的 SPT 服务器文件，请将 AUTO_UPDATE_SPT 设置为 true"
+        echo "中止"
         exit 1
     fi
 
-    echo "Updating SPT in-place, from $1 to $spt_version"
+    echo "更新 SPT in-place, from $1 to $spt_version"
     # Backup SPT, install new version, then halt
     backup_spt_user_dirs
     install_spt
-    echo "SPT update completed. We moved from $1 to $spt_version"
+    echo "SPT 更新完成。我们从 $1 移动到 $spt_version"
     echo "  "
     echo "  ==============="
     echo "  === WARNING ==="
@@ -266,7 +268,7 @@ spt_listen_on_all_networks() {
     modified_http_json="$(jq '.ip = "0.0.0.0" | .backendIp = "0.0.0.0"' $http_json)" && echo -E "${modified_http_json}" > $http_json
     # If fika server config exists, modify that too
     if [[ -f "$fika_mod_dir/$fika_config_path" ]]; then
-        echo "Setting listen all networks in Fika SPT config override"
+        echo "设置 Fika SPT 配置覆盖中的所有网络监听"
         modified_fika_jsonc="$(jq '.server.SPT.http.ip = "0.0.0.0" | .server.SPT.http.backendIp = "0.0.0.0"' $fika_mod_dir/$fika_config_path)" && echo -E "${modified_fika_jsonc}" > $fika_mod_dir/$fika_config_path
     fi
 }
@@ -277,7 +279,7 @@ spt_listen_on_all_networks() {
 
 install_requested_mods() {
     # Run the download & install mods script
-    echo "Downloading and installing other mods"
+    echo "下载并安装其他模组"
     /usr/bin/download_unzip_install_mods $mounted_dir
 }
 
@@ -289,10 +291,10 @@ validate
 
 # If no server binary in this directory, copy our built files in here and run it once
 if [[ ! -f "$mounted_dir/$spt_binary" ]]; then
-    echo "Server files not found, initializing first boot..."
+    echo "未找到服务器文件，正在初始化第一次启动..."
     install_spt
 else
-    echo "Found server files, skipping init"
+    echo "找到服务器文件，跳过初始化"
 fi
 
 # Install listen on all interfaces is requested.
@@ -302,11 +304,11 @@ fi
 
 # Install fika if requested. Run each boot to support installing in existing serverfiles that don't have fika installed
 if [[ "$install_fika" == "true" ]]; then
-    if [[ ! -d $fika_mod_dir ]]; then
-        echo "No Fika server mod detected and install was requested. Beginning installation."
+    if [[ ! -d $fika_mod_dir || ! -f $fika_mod_dir/package.json ]]; then
+        echo "没有检测到Fika服务器mod，安装请求已发出。开始安装。"
         install_fika_mod
-    else 
-        echo "Fika install requested but Fika server mod dir already exists, skipping Fika installation"
+    else
+        echo "请求安装Fika，但Fika服务器mod目录已存在，跳过Fika安装"
     fi
 fi
 
@@ -330,8 +332,8 @@ set_timezone
 
 # Run the server
 if is_pterodactyl_env; then
-    echo "Starting SPT Server in Pterodactyl environment"
-    
+    echo "在 Pterodactyl 环境中启动 SPT 服务器"
+
     # Create a temporary passwd entry to fix Node.js user lookup
     current_uid=$(id -u)
     current_gid=$(id -g)
@@ -339,7 +341,7 @@ if is_pterodactyl_env; then
     
     # Create temporary passwd file if it doesn't contain current user
     if ! getent passwd $current_uid >/dev/null 2>&1; then
-        echo "Creating temporary user entry for Node.js compatibility"
+        echo "创建临时用户条目以兼容 Node.js"
         # Create a temporary passwd file
         temp_passwd="/tmp/passwd"
         cp /etc/passwd "$temp_passwd" 2>/dev/null || touch "$temp_passwd"
