@@ -167,17 +167,158 @@ set_timezone() {
 ########
 # Fika #
 ########
+
+# 检查下载前置条件
+check_download_prerequisites() {
+    local target_file="$1"
+    local min_space_mb=100  # 至少需要100MB空间
+    
+    echo "检查下载前置条件..."
+    
+    # 检查磁盘空间
+    if command -v df >/dev/null 2>&1; then
+        available_space=$(df . 2>/dev/null | tail -1 | awk '{print $4}' || echo "0")
+        # 将KB转换为MB (除以1024)
+        available_space_mb=$((available_space / 1024))
+        echo "可用磁盘空间: ${available_space_mb}MB"
+        
+        if [ $available_space_mb -lt $min_space_mb ]; then
+            echo "错误：磁盘空间不足！需要至少 ${min_space_mb}MB，但只有 ${available_space_mb}MB"
+            return 1
+        fi
+    else
+        echo "警告：无法检查磁盘空间"
+    fi
+    
+    # 检查目录写入权限
+    test_file="test_write_$$"
+    if ! touch "$test_file" 2>/dev/null; then
+        echo "错误：当前目录无写入权限"
+        echo "当前目录: $(pwd)"
+        echo "当前用户: $(whoami 2>/dev/null || echo "unknown")"
+        return 1
+    fi
+    rm -f "$test_file"
+    
+    # 检查网络连接
+    echo "检查网络连接..."
+    if ! curl -s --connect-timeout 10 --max-time 15 -I "https://github.com" >/dev/null 2>&1; then
+        echo "警告：无法连接到GitHub，可能存在网络问题"
+        # 不直接返回错误，因为可能是暂时性问题
+    fi
+    
+    echo "下载前置条件检查完成"
+    return 0
+}
+
 install_fika_mod() {
     echo "安装 Fika servermod 版本 $fika_version"
     echo "Fika release URL: $fika_release_url"
     # Assumes fika_server.zip artifact contains user/mods/fika-server
+    
+    # 运行下载前置条件检查
+    if ! check_download_prerequisites "$fika_artifact"; then
+        echo "错误：下载前置条件不满足，中止安装"
+        exit 1
+    fi
+    
+    # 检查磁盘空间和权限
+    echo "检查系统状态..."
+    echo "当前工作目录: $(pwd)"
+    echo "磁盘空间使用情况:"
+    df -h . 2>/dev/null || echo "无法获取磁盘空间信息"
+    echo "目录权限: $(ls -ld . 2>/dev/null || echo "无法获取权限信息")"
+    
+    # 确保工作目录可写
+    if ! touch test_write_$$ 2>/dev/null; then
+        echo "错误：无法在当前目录创建文件，检查权限"
+        echo "当前目录: $(pwd)"
+        echo "当前用户: $(whoami 2>/dev/null || echo "unknown")"
+        exit 1
+    fi
+    rm -f test_write_$$
+    
     # 增加更多curl日志和错误处理
     echo "正在下载 Fika 服务器模组..."
+    echo "目标文件路径: $(pwd)/$fika_artifact"
+    
+    # 尝试下载，并提供更详细的错误信息
     if ! curl -sL --fail --show-error --connect-timeout 30 --max-time 300 -o "$fika_artifact" "$fika_release_url"; then
+        curl_exit_code=$?
         echo "错误：下载 Fika 服务器模组失败"
         echo "URL: $fika_release_url"
         echo "目标文件: $fika_artifact"
-        exit 1
+        echo "curl 退出代码: $curl_exit_code"
+        
+        # 提供针对性的解决建议
+        case $curl_exit_code in
+            23)
+                echo "错误代码 23: 无法写入目标文件"
+                echo "可能的原因："
+                echo "  1. 磁盘空间不足"
+                echo "  2. 目录权限不足"
+                echo "  3. 文件系统只读"
+                echo "  4. 目标路径不存在"
+                ;;
+            6)
+                echo "错误代码 6: 无法解析主机"
+                ;;
+            7)
+                echo "错误代码 7: 无法连接到服务器"
+                ;;
+            22)
+                echo "错误代码 22: HTTP 错误（可能是 404 Not Found）"
+                ;;
+            28)
+                echo "错误代码 28: 操作超时"
+                ;;
+            *)
+                echo "其他错误，请检查网络连接和权限"
+                ;;
+        esac
+        
+        echo "诊断信息："
+        echo "  磁盘空间: $(df -h . 2>/dev/null | tail -1 || echo "无法获取")"
+        echo "  工作目录: $(pwd)"
+        echo "  目录权限: $(ls -ld . 2>/dev/null || echo "无法获取")"
+        
+        # 尝试备用下载方法
+        echo ""
+        echo "尝试备用下载方法..."
+        
+        # 方法1: 尝试直接从GitHub下载（去掉代理）
+        direct_url="https://github.com/project-fika/Fika-Server/releases/download/$fika_version/$fika_artifact"
+        echo "尝试直接从GitHub下载: $direct_url"
+        if curl -sL --fail --show-error --connect-timeout 30 --max-time 300 -o "$fika_artifact" "$direct_url"; then
+            echo "备用下载方法成功！"
+        else
+            echo "直接下载也失败了"
+            
+            # 方法2: 尝试使用wget
+            if command -v wget >/dev/null 2>&1; then
+                echo "尝试使用 wget 下载..."
+                if wget -q --timeout=30 -O "$fika_artifact" "$fika_release_url" || wget -q --timeout=30 -O "$fika_artifact" "$direct_url"; then
+                    echo "wget 下载成功！"
+                else
+                    echo "wget 下载也失败了"
+                    echo ""
+                    echo "所有下载方法都失败了。请手动解决以下问题："
+                    echo "1. 检查磁盘空间是否充足"
+                    echo "2. 检查目录权限"
+                    echo "3. 检查网络连接"
+                    echo "4. 验证URL是否有效: $fika_release_url"
+                    exit 1
+                fi
+            else
+                echo ""
+                echo "所有下载方法都失败了。请手动解决以下问题："
+                echo "1. 检查磁盘空间是否充足"
+                echo "2. 检查目录权限"
+                echo "3. 检查网络连接"
+                echo "4. 验证URL是否有效: $fika_release_url"
+                exit 1
+            fi
+        fi
     fi
     echo "Fika 服务器模组下载完成"
     echo "解压 Fika servermod"
